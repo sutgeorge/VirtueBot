@@ -9,6 +9,7 @@ use serenity::{
     prelude::*,
 };
 use serde::Deserialize;
+use rand::Rng;
 
 struct Handler;
 
@@ -31,18 +32,35 @@ fn read_file(filepath: &str) -> String {
     contents
 }
 
-fn create_object_from_json_file() {
+fn create_object_from_json_file() -> serde_json::Value {
     let file_contents = read_file("quotes.json");
     let json_object: serde_json::Value = serde_json::from_str(file_contents.as_str()).unwrap();
 
-    println!("{:#?}", json_object["quotes"][0]["quote"]);
+    json_object
+}
+
+fn send_random_quote(ctx: &Context, msg: &Message) {
+    let quotes: serde_json::Value = create_object_from_json_file();
+    let mut random_number_generator = rand::thread_rng();
+    let random_quote_index = random_number_generator.gen_range(0, 404);
+    let quote = quotes["quotes"][random_quote_index].get("quote").unwrap();
+    let author = quotes["quotes"][random_quote_index].get("author").unwrap();
+    let source = quotes["quotes"][random_quote_index].get("source").unwrap();
+
+    let formatted_quote = format!("```{}\n{}, {}```", quote,
+    author.to_string().replace("\"", ""),
+    source.to_string().replace("\"", ""));
+
+    if let Err(why) = msg.channel_id.say(&ctx.http, formatted_quote) {
+        println!("Error sending quote: {:?}", why);
+    }
 }
 
 impl EventHandler for Handler {
     fn message(&self, ctx: Context, msg: Message) {
         match msg.content.as_str() {
             "!ping" => ping(&ctx, &msg),
-            "!print_json" => create_object_from_json_file(),
+            "!quote" => send_random_quote(&ctx, &msg),
             _ => {}
         }
     }
